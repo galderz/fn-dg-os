@@ -1,8 +1,6 @@
-* JDG template
-Comes from:
-https://github.com/infinispan-demos/JDG-x-site-replication-demo/blob/master/jdg-x-site-replication-template.yml
-
-And then processed via:
+* Deploying via Fabric8
+Fabric8 maven plugin does not yet work fully well with OpenShift 3.7.
+So, to avoid redeployment issues, execute:
 #+BEGIN_SRC shell
-oc process -f jdg-x-site-replication-template.yml -o yaml > jdg-template.yaml
+mvn -Dfabric8.openshift.trimImageInContainerSpec=true fabric8:deploy
 #+END_SRC
