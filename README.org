@@ -1,0 +1,8 @@
+* JDG template
+Comes from:
+https://github.com/infinispan-demos/JDG-x-site-replication-demo/blob/master/jdg-x-site-replication-template.yml
+
+And then processed via:
+#+BEGIN_SRC shell
+oc process -f jdg-x-site-replication-template.yml -o yaml > jdg-template.yaml
+#+END_SRC
