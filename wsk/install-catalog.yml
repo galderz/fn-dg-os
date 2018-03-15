@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: install-catalog
+spec:
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      name: install-catalog
+    spec:
+      containers:
+      - name: catalog
+        image: projectodd/whisk_catalog:openshift-latest
+        env:
+          - name: "WHISK_CLI_VERSION"
+            valueFrom:
+              configMapKeyRef:
+                name: whisk.config
+                key: whisk_cli_version_tag
+          - name: "WHISK_AUTH"
+            valueFrom:
+              secretKeyRef:
+                name: whisk.auth
+                key: system
+          - name: "WHISK_API_HOST_NAME"
+            value: "http://controller:8080"
+      initContainers:
+      - name: wait-for-controller
+        image: busybox
+        command: ['sh', '-c', 'until wget -T 5 --spider http://controller:8080/ping; do echo waiting for controller; sleep 2; done;']
+      restartPolicy: Never
