@@ -1,4 +1,4 @@
-package fn.dg.os.vertx;
+package fn.dg.os.vertx.hello;
 
 import hu.akarnokd.rxjava2.interop.CompletableInterop;
 import io.reactivex.Completable;
