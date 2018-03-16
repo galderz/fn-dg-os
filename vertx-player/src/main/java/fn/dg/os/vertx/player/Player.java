@@ -42,4 +42,12 @@ public class Player {
       this.score = score;
    }
 
+   @Override
+   public String toString() {
+      return "Player{" +
+         "id='" + id + '\'' +
+         ", score=" + score +
+         '}';
+   }
+
 }

@@ -61,8 +61,11 @@ public class Main extends AbstractVerticle {
 
                vertx.setPeriodic(1000, id -> {
                   final String uuid = UUID.randomUUID().toString();
-                  int score = r.nextInt(1000) + 100; // 3 digit number
-                  cache.putAsync(uuid, new Player(uuid, score));
+                  int score = r.nextInt(1000); // 3 digit number
+
+                  final Player player = new Player(uuid, score);
+                  log.info(String.format("put(value=%s)", player));
+                  cache.putAsync(uuid, player);
                });
 
                rc.response().end("Injector started");
@@ -90,6 +93,7 @@ public class Main extends AbstractVerticle {
    }
 
    private static JsonObject queryLeaderboard(RemoteCache<String, Player> remoteCache) {
+      log.info("Query leaderboard: ");
       QueryFactory qf = Search.getQueryFactory(remoteCache);
       Query query = qf.from(Player.class)
          .orderBy("score")
@@ -97,9 +101,10 @@ public class Main extends AbstractVerticle {
          .build();
       List<Player> list = query.list();
       JsonObject json = new JsonObject();
-      list.forEach(player ->
-         json.put(player.getId().toString(), player.getScore())
-      );
+      list.forEach(player -> {
+         log.info("Player: " + player);
+         json.put(player.getId().toString(), player.getScore());
+      });
 
       return json;
    }
