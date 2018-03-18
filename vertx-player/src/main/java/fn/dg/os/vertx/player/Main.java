@@ -1,6 +1,6 @@
 package fn.dg.os.vertx.player;
 
-import io.netty.handler.logging.LogLevel;
+import hu.akarnokd.rxjava2.interop.CompletableInterop;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.core.AbstractVerticle;
@@ -26,7 +26,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.infinispan.query.dsl.Expression.max;
+import static io.reactivex.Single.just;
 
 public class Main extends AbstractVerticle {
 
@@ -55,6 +55,7 @@ public class Main extends AbstractVerticle {
       vertx
          .rxExecuteBlocking(Main::remoteCacheManager)
          .flatMap(remote -> vertx.rxExecuteBlocking(remoteCache(remote)))
+         .flatMap(cache -> CompletableInterop.fromFuture(cache.clearAsync()).andThen(just(cache)))
          .subscribe(
             cache -> {
                Random r = new Random();
@@ -82,7 +83,7 @@ public class Main extends AbstractVerticle {
          .flatMap(cache -> vertx.rxExecuteBlocking(leaderboard(cache)))
          .subscribe(
             json ->
-               rc.response().end(json.toString())
+               rc.response().end(json.encodePrettily())
             , failure ->
                rc.response().end("Failed: " + failure)
          );
@@ -96,7 +97,7 @@ public class Main extends AbstractVerticle {
       log.info("Query leaderboard: ");
       QueryFactory qf = Search.getQueryFactory(remoteCache);
       Query query = qf.from(Player.class)
-         .orderBy("score")
+         .orderBy("score", SortOrder.DESC)
          .maxResults(10)
          .build();
       List<Player> list = query.list();
