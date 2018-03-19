@@ -2,6 +2,7 @@ package fn.dg.os.vertx.player;
 
 import hu.akarnokd.rxjava2.interop.CompletableInterop;
 import io.vertx.core.Handler;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.Future;
@@ -89,11 +90,11 @@ public class Main extends AbstractVerticle {
          );
    }
 
-   private static Handler<Future<JsonObject>> leaderboard(RemoteCache<String, Player> remoteCache) {
+   private static Handler<Future<JsonArray>> leaderboard(RemoteCache<String, Player> remoteCache) {
       return f -> f.complete(queryLeaderboard(remoteCache));
    }
 
-   private static JsonObject queryLeaderboard(RemoteCache<String, Player> remoteCache) {
+   private static JsonArray queryLeaderboard(RemoteCache<String, Player> remoteCache) {
       log.info("Query leaderboard: ");
       QueryFactory qf = Search.getQueryFactory(remoteCache);
       Query query = qf.from(Player.class)
@@ -101,10 +102,11 @@ public class Main extends AbstractVerticle {
          .maxResults(10)
          .build();
       List<Player> list = query.list();
-      JsonObject json = new JsonObject();
+      JsonArray json = new JsonArray();
       list.forEach(player -> {
          log.info("Player: " + player);
-         json.put(player.getId().toString(), player.getScore());
+         // TODO: Just send back user name and score
+         json.add(new JsonObject().put(player.getId().toString(), player.getScore()));
       });
 
       return json;
