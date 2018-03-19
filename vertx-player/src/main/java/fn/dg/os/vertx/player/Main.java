@@ -62,12 +62,12 @@ public class Main extends AbstractVerticle {
                Random r = new Random();
 
                vertx.setPeriodic(1000, id -> {
-                  final String uuid = UUID.randomUUID().toString();
+                  final String name = UUID.randomUUID().toString();
                   int score = r.nextInt(1000); // 3 digit number
 
-                  final Player player = new Player(uuid, score);
+                  final Player player = new Player(name, score);
                   log.info(String.format("put(value=%s)", player));
-                  cache.putAsync(uuid, player);
+                  cache.putAsync(name, player);
                });
 
                rc.response().end("Injector started");
@@ -90,11 +90,11 @@ public class Main extends AbstractVerticle {
          );
    }
 
-   private static Handler<Future<JsonArray>> leaderboard(RemoteCache<String, Player> remoteCache) {
+   private static Handler<Future<JsonObject>> leaderboard(RemoteCache<String, Player> remoteCache) {
       return f -> f.complete(queryLeaderboard(remoteCache));
    }
 
-   private static JsonArray queryLeaderboard(RemoteCache<String, Player> remoteCache) {
+   private static JsonObject queryLeaderboard(RemoteCache<String, Player> remoteCache) {
       log.info("Query leaderboard: ");
       QueryFactory qf = Search.getQueryFactory(remoteCache);
       Query query = qf.from(Player.class)
@@ -102,12 +102,21 @@ public class Main extends AbstractVerticle {
          .maxResults(10)
          .build();
       List<Player> list = query.list();
-      JsonArray json = new JsonArray();
+
+      final JsonObject json = new JsonObject();
+
+      JsonArray top10 = new JsonArray();
       list.forEach(player -> {
          log.info("Player: " + player);
-         // TODO: Just send back user name and score
-         json.add(new JsonObject().put(player.getId().toString(), player.getScore()));
+         top10.add(new JsonObject()
+            .put("name", player.getName())
+            .put("score", player.getScore())
+            .put("achievements", new JsonObject()));
       });
+
+      json.put("top10", top10);
+      // TODO: Current players to be calculated using some other method
+      json.put("currentPlayers", remoteCache.size());
 
       return json;
    }

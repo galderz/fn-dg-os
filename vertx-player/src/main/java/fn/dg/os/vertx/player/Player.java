@@ -4,32 +4,30 @@ import org.infinispan.protostream.annotations.ProtoDoc;
 import org.infinispan.protostream.annotations.ProtoField;
 import org.infinispan.protostream.annotations.ProtoMessage;
 
-import java.util.UUID;
-
 @ProtoDoc("@Indexed")
 @ProtoMessage(name = "Player")
 public class Player {
 
-   private String id;
+   private String name;
    private int score;
 
    // Required for proto schema builder
    public Player() {
    }
 
-   public Player(String id, int score) {
+   public Player(String name, int score) {
       this.score = score;
-      this.id = id;
+      this.name = name;
    }
 
    @ProtoDoc("@Field(index = Index.NO, store = Store.NO)")
    @ProtoField(number = 10, required = true)
-   public String getId() {
-      return id;
+   public String getName() {
+      return name;
    }
 
-   public void setId(String id) {
-      this.id = id;
+   public void setName(String name) {
+      this.name = name;
    }
 
    @ProtoDoc("@IndexedField")
@@ -45,7 +43,7 @@ public class Player {
    @Override
    public String toString() {
       return "Player{" +
-         "id='" + id + '\'' +
+         "name='" + name + '\'' +
          ", score=" + score +
          '}';
    }
