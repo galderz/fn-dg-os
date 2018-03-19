@@ -32,6 +32,7 @@ import static io.reactivex.Single.just;
 public class Main extends AbstractVerticle {
 
    static final Logger log = Logger.getLogger(Main.class.getName());
+   private RemoteCache<String, Player> playerCache;
 
    @Override
    public void start(io.vertx.core.Future<Void> future) {
@@ -43,9 +44,12 @@ public class Main extends AbstractVerticle {
          .createHttpServer()
          .requestHandler(router::accept)
          .rxListen(8080)
+         .flatMap(server -> vertx.rxExecuteBlocking(Main::remoteCacheManager))
+         .flatMap(remote -> vertx.rxExecuteBlocking(playerCache(remote)))
          .subscribe(
-            server -> {
-               log.info("Http server started");
+            playerCache -> {
+               log.info("Player cache retrieved and HTTP server started");
+               this.playerCache = playerCache;
                future.complete();
             }
             , future::fail
@@ -53,12 +57,10 @@ public class Main extends AbstractVerticle {
    }
 
    private void inject(RoutingContext rc) {
-      vertx
-         .rxExecuteBlocking(Main::remoteCacheManager)
-         .flatMap(remote -> vertx.rxExecuteBlocking(remoteCache(remote)))
-         .flatMap(cache -> CompletableInterop.fromFuture(cache.clearAsync()).andThen(just(cache)))
+      CompletableInterop
+         .fromFuture(playerCache.clearAsync())
          .subscribe(
-            cache -> {
+            () -> {
                Random r = new Random();
 
                vertx.setPeriodic(1000, id -> {
@@ -67,7 +69,7 @@ public class Main extends AbstractVerticle {
 
                   final Player player = new Player(name, score);
                   log.info(String.format("put(value=%s)", player));
-                  cache.putAsync(name, player);
+                  playerCache.putAsync(name, player);
                });
 
                rc.response().end("Injector started");
@@ -80,7 +82,7 @@ public class Main extends AbstractVerticle {
    private void getLeaderboard(RoutingContext rc) {
       vertx
          .rxExecuteBlocking(Main::remoteCacheManager)
-         .flatMap(remote -> vertx.rxExecuteBlocking(remoteCache(remote)))
+         .flatMap(remote -> vertx.rxExecuteBlocking(playerCache(remote)))
          .flatMap(cache -> vertx.rxExecuteBlocking(leaderboard(cache)))
          .subscribe(
             json ->
@@ -153,7 +155,7 @@ public class Main extends AbstractVerticle {
       }
    }
 
-   private static Handler<Future<RemoteCache<String, Player>>> remoteCache(RemoteCacheManager remote) {
+   private static Handler<Future<RemoteCache<String, Player>>> playerCache(RemoteCacheManager remote) {
       return f -> f.complete(remote.getCache("index"));
    }
 
