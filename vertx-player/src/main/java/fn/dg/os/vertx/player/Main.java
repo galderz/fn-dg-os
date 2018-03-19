@@ -11,8 +11,12 @@ import io.vertx.reactivex.ext.web.RoutingContext;
 import org.infinispan.client.hotrod.RemoteCache;
 import org.infinispan.client.hotrod.RemoteCacheManager;
 import org.infinispan.client.hotrod.Search;
+import org.infinispan.client.hotrod.annotation.ClientCacheEntryCreated;
+import org.infinispan.client.hotrod.annotation.ClientListener;
 import org.infinispan.client.hotrod.configuration.ConfigurationBuilder;
+import org.infinispan.client.hotrod.event.ClientCacheEntryCustomEvent;
 import org.infinispan.client.hotrod.marshall.ProtoStreamMarshaller;
+import org.infinispan.commons.util.KeyValueWithPrevious;
 import org.infinispan.protostream.SerializationContext;
 import org.infinispan.protostream.annotations.ProtoSchemaBuilder;
 import org.infinispan.query.dsl.Query;
@@ -27,12 +31,18 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static io.reactivex.Single.just;
-
 public class Main extends AbstractVerticle {
 
    static final Logger log = Logger.getLogger(Main.class.getName());
+   private RemoteCacheManager playerRemote; // protostream marshaller
+   private RemoteCacheManager scoreRemote; // normal marshaller
    private RemoteCache<String, Player> playerCache;
+
+   // Use String values to avoid:
+   // java.lang.ClassNotFoundException: fn.dg.os.vertx.player.Score from [Module "org.infinispan.server.hotrod"
+   private RemoteCache<String, String> scoreCache;
+
+   private ScoreListener listener = new ScoreListener();;
 
    @Override
    public void start(io.vertx.core.Future<Void> future) {
@@ -41,15 +51,32 @@ public class Main extends AbstractVerticle {
       router.get("/leaderboard").handler(this::getLeaderboard);
 
       vertx
-         .createHttpServer()
-         .requestHandler(router::accept)
-         .rxListen(8080)
-         .flatMap(server -> vertx.rxExecuteBlocking(Main::remoteCacheManager))
-         .flatMap(remote -> vertx.rxExecuteBlocking(playerCache(remote)))
+         .rxExecuteBlocking(this::remoteCacheManager)
+         .flatMap(x -> vertx.rxExecuteBlocking(playerCache()))
+         .flatMap(x -> vertx.rxExecuteBlocking(scoreCache()))
+         .flatMap(x ->
+            vertx
+               .createHttpServer()
+               .requestHandler(router::accept)
+               .rxListen(8080))
          .subscribe(
-            playerCache -> {
-               log.info("Player cache retrieved and HTTP server started");
-               this.playerCache = playerCache;
+            server -> {
+               log.info("Caches retrieved and HTTP server started");
+               future.complete();
+            }
+            , future::fail
+         );
+   }
+
+   @Override
+   public void stop(io.vertx.core.Future<Void> future) {
+      vertx
+         .rxExecuteBlocking(this::removeScoreListener)
+         .flatMap(x -> vertx.rxExecuteBlocking(stopRemote(playerRemote)))
+         .flatMap(x -> vertx.rxExecuteBlocking(stopRemote(scoreRemote)))
+         .subscribe(
+            server -> {
+               log.info("Removed listener and stopped remotes");
                future.complete();
             }
             , future::fail
@@ -72,6 +99,19 @@ public class Main extends AbstractVerticle {
                   playerCache.putAsync(name, player);
                });
 
+               vertx.setPeriodic(1000, id -> {
+                  JsonObject scores = new JsonObject();
+                  scores.put(Task.DOG.toString(), r.nextDouble());
+                  scores.put(Task.CAT.toString(), r.nextDouble());
+                  scores.put(Task.PERSON.toString(), r.nextDouble());
+                  scores.put(Task.PENGUIN.toString(), r.nextDouble());
+
+                  final String url = UUID.randomUUID().toString();
+
+                  log.info(String.format("put(value=%s)", scores));
+                  scoreCache.putAsync(url, scores.toString());
+               });
+
                rc.response().end("Injector started");
             }
             , failure ->
@@ -81,9 +121,7 @@ public class Main extends AbstractVerticle {
 
    private void getLeaderboard(RoutingContext rc) {
       vertx
-         .rxExecuteBlocking(Main::remoteCacheManager)
-         .flatMap(remote -> vertx.rxExecuteBlocking(playerCache(remote)))
-         .flatMap(cache -> vertx.rxExecuteBlocking(leaderboard(cache)))
+         .rxExecuteBlocking(leaderboard())
          .subscribe(
             json ->
                rc.response().end(json.encodePrettily())
@@ -92,8 +130,8 @@ public class Main extends AbstractVerticle {
          );
    }
 
-   private static Handler<Future<JsonObject>> leaderboard(RemoteCache<String, Player> remoteCache) {
-      return f -> f.complete(queryLeaderboard(remoteCache));
+   private Handler<Future<JsonObject>> leaderboard() {
+      return f -> f.complete(queryLeaderboard(playerCache));
    }
 
    private static JsonObject queryLeaderboard(RemoteCache<String, Player> remoteCache) {
@@ -123,19 +161,28 @@ public class Main extends AbstractVerticle {
       return json;
    }
 
-   private static void remoteCacheManager(Future<RemoteCacheManager> f) {
-      final RemoteCacheManager remote = new RemoteCacheManager(
+   private void remoteCacheManager(Future<Void> f) {
+      this.playerRemote = new RemoteCacheManager(
          new ConfigurationBuilder()
             .addServer()
-               //.host("jdg-app-hotrod")
-               .host("infinispan-app-hotrod")
-               .port(11222)
+            //.host("jdg-app-hotrod")
+            .host("infinispan-app-hotrod")
+            .port(11222)
             .marshaller(ProtoStreamMarshaller.class)
             .build()
       );
 
+      this.scoreRemote = new RemoteCacheManager(
+         new ConfigurationBuilder()
+            .addServer()
+            //.host("jdg-app-hotrod")
+            .host("infinispan-app-hotrod")
+            .port(11222)
+            .build()
+      );
+
       SerializationContext serialCtx =
-         ProtoStreamMarshaller.getSerializationContext(remote);
+         ProtoStreamMarshaller.getSerializationContext(playerRemote);
 
       ProtoSchemaBuilder protoSchemaBuilder = new ProtoSchemaBuilder();
       try {
@@ -143,20 +190,69 @@ public class Main extends AbstractVerticle {
             .addClass(Player.class)
             .build(serialCtx);
 
-         RemoteCache<String, String> metadataCache = remote
+         RemoteCache<String, String> metadataCache = playerRemote
             .getCache(ProtobufMetadataManagerConstants.PROTOBUF_METADATA_CACHE_NAME);
 
          metadataCache.put("player.proto", playerSchemaFile);
 
-         f.complete(remote);
+         f.complete(null);
       } catch (IOException e) {
          log.log(Level.SEVERE, "Unable to auto-generate player.proto", e);
          f.fail(e);
       }
    }
 
-   private static Handler<Future<RemoteCache<String, Player>>> playerCache(RemoteCacheManager remote) {
-      return f -> f.complete(remote.getCache("index"));
+   private Handler<Future<RemoteCache<String, Player>>> playerCache() {
+      return f -> {
+         final RemoteCache<String, Player> cache = playerRemote.getCache("index");
+         this.playerCache = cache;
+         f.complete(cache);
+      };
+   }
+
+   private Handler<Future<RemoteCache<String, String>>> scoreCache() {
+      return f -> {
+         // TODO Should be `scores`
+         final RemoteCache<String, String> cache = scoreRemote.getCache("default");
+         this.scoreCache = cache;
+         cache.addClientListener(listener);
+         f.complete(cache);
+      };
+   }
+
+   private Handler<Future<Void>> stopRemote(RemoteCacheManager remote) {
+      return f -> {
+         remote.stop();
+         f.complete(null);
+      };
+   }
+
+   private void removeScoreListener(Future<Void> f) {
+      scoreCache.removeClientListener(listener);
+      f.complete(null);
+   }
+
+   @ClientListener(converterFactoryName = "key-value-with-previous-converter-factory")
+   private static final class ScoreListener {
+
+      @ClientCacheEntryCreated
+      @SuppressWarnings("unused")
+      public void handleCacheEntryEvent(
+            ClientCacheEntryCustomEvent<KeyValueWithPrevious<String, String>> e) {
+         System.out.println(e);
+
+//         byte[] eventData = e.getEventData();
+//         final GenericJBossMarshaller marshaller = new GenericJBossMarshaller();
+//         try {
+//            final Object obj = marshaller.objectFromByteBuffer(eventData);
+//            System.out.println(obj);
+//         } catch (IOException e1) {
+//            e1.printStackTrace();  // TODO: Customise this generated block
+//         } catch (ClassNotFoundException e1) {
+//            e1.printStackTrace();  // TODO: Customise this generated block
+//         }
+      }
+
    }
 
 }
