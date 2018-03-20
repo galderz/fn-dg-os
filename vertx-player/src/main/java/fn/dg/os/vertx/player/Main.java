@@ -4,10 +4,15 @@ import hu.akarnokd.rxjava2.interop.CompletableInterop;
 import io.vertx.core.Handler;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.bridge.BridgeEventType;
+import io.vertx.ext.bridge.PermittedOptions;
+import io.vertx.ext.web.handler.sockjs.BridgeOptions;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.Future;
+import io.vertx.reactivex.core.Vertx;
 import io.vertx.reactivex.ext.web.Router;
 import io.vertx.reactivex.ext.web.RoutingContext;
+import io.vertx.reactivex.ext.web.handler.sockjs.SockJSHandler;
 import org.infinispan.client.hotrod.RemoteCache;
 import org.infinispan.client.hotrod.RemoteCacheManager;
 import org.infinispan.client.hotrod.Search;
@@ -25,7 +30,9 @@ import org.infinispan.query.dsl.SortOrder;
 import org.infinispan.query.remote.client.ProtobufMetadataManagerConstants;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -49,6 +56,7 @@ public class Main extends AbstractVerticle {
       Router router = Router.router(vertx);
       router.get("/inject").handler(this::inject);
       router.get("/leaderboard").handler(this::getLeaderboard);
+      router.get("/scores/*").handler(sockJSHandler(vertx));
 
       vertx
          .rxExecuteBlocking(this::remoteCacheManager)
@@ -161,6 +169,19 @@ public class Main extends AbstractVerticle {
       return json;
    }
 
+   private static Handler<RoutingContext> sockJSHandler(Vertx vertx) {
+      SockJSHandler sockJSHandler = SockJSHandler.create(vertx);
+      PermittedOptions outPermit = new PermittedOptions().setAddress("image-scores");
+      BridgeOptions options = new BridgeOptions().addOutboundPermitted(outPermit);
+      sockJSHandler.bridge(options, be -> {
+         if (be.type() == BridgeEventType.REGISTER)
+            log.info("SockJs: client connected");
+
+         be.complete(true);
+      });
+      return sockJSHandler;
+   }
+
    private void remoteCacheManager(Future<Void> f) {
       this.playerRemote = new RemoteCacheManager(
          new ConfigurationBuilder()
@@ -233,24 +254,22 @@ public class Main extends AbstractVerticle {
    }
 
    @ClientListener(converterFactoryName = "key-value-with-previous-converter-factory")
-   private static final class ScoreListener {
+   private final class ScoreListener {
 
       @ClientCacheEntryCreated
       @SuppressWarnings("unused")
       public void handleCacheEntryEvent(
             ClientCacheEntryCustomEvent<KeyValueWithPrevious<String, String>> e) {
          System.out.println(e);
+         vertx.eventBus().publish("image-scores", toJson(e));
+      }
 
-//         byte[] eventData = e.getEventData();
-//         final GenericJBossMarshaller marshaller = new GenericJBossMarshaller();
-//         try {
-//            final Object obj = marshaller.objectFromByteBuffer(eventData);
-//            System.out.println(obj);
-//         } catch (IOException e1) {
-//            e1.printStackTrace();  // TODO: Customise this generated block
-//         } catch (ClassNotFoundException e1) {
-//            e1.printStackTrace();  // TODO: Customise this generated block
-//         }
+      private String toJson(ClientCacheEntryCustomEvent<KeyValueWithPrevious<String, String>> e) {
+         KeyValueWithPrevious<String, String> pair = e.getEventData();
+         Map<String, Object> map = new HashMap<>();
+         map.put("imageURL", pair.getKey());
+         map.put("scores", pair.getValue());
+         return new JsonObject(map).encode();
       }
 
    }
