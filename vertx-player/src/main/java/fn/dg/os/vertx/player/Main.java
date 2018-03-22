@@ -266,10 +266,10 @@ public class Main extends AbstractVerticle {
 
       private String toJson(ClientCacheEntryCustomEvent<KeyValueWithPrevious<String, String>> e) {
          KeyValueWithPrevious<String, String> pair = e.getEventData();
-         Map<String, Object> map = new HashMap<>();
-         map.put("imageURL", pair.getKey());
-         map.put("scores", pair.getValue());
-         return new JsonObject(map).encode();
+         final JsonObject json = new JsonObject();
+         json.put("imageURL", pair.getKey());
+         json.put("scores", new JsonObject(pair.getValue()));
+         return json.encodePrettily();
       }
 
    }
