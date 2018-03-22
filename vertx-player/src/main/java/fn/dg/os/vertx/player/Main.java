@@ -49,6 +49,9 @@ public class Main extends AbstractVerticle {
    // java.lang.ClassNotFoundException: fn.dg.os.vertx.player.Score from [Module "org.infinispan.server.hotrod"
    private RemoteCache<String, String> scoreCache;
 
+   private long playerTimer;
+   private long scoreTimer;
+
    private ScoreListener listener = new ScoreListener();;
 
    @Override
@@ -78,6 +81,9 @@ public class Main extends AbstractVerticle {
 
    @Override
    public void stop(io.vertx.core.Future<Void> future) {
+      vertx.cancelTimer(playerTimer);
+      vertx.cancelTimer(scoreTimer);
+
       vertx
          .rxExecuteBlocking(this::removeScoreListener)
          .flatMap(x -> vertx.rxExecuteBlocking(stopRemote(playerRemote)))
@@ -98,7 +104,7 @@ public class Main extends AbstractVerticle {
             () -> {
                Random r = new Random();
 
-               vertx.setPeriodic(1000, id -> {
+               playerTimer = vertx.setPeriodic(1000, id -> {
                   final String name = UUID.randomUUID().toString();
                   int score = r.nextInt(1000); // 3 digit number
 
@@ -107,7 +113,7 @@ public class Main extends AbstractVerticle {
                   playerCache.putAsync(name, player);
                });
 
-               vertx.setPeriodic(1000, id -> {
+               scoreTimer = vertx.setPeriodic(1000, id -> {
                   JsonObject scores = new JsonObject();
                   scores.put(Task.DOG.toString(), r.nextDouble());
                   scores.put(Task.CAT.toString(), r.nextDouble());
