@@ -37,7 +37,7 @@ Create action:
 mvn clean package
 wsk -i action create scoresPushAction \
   target/fn-c.jar \
-  --main fn.dg.os.fnc.ScoresPushAction
+  --main fn.dg.os.fnc.CalculateScoresAction
 ```
 
 Create rule:
