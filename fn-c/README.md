@@ -1,4 +1,4 @@
-# Instructions
+# Instructions for simple test
 
 Install Infinispan Feed Provider.
 Instructions below assumes you have a CouchDB and OpenWhisk set up available:
@@ -13,7 +13,7 @@ Install Infinispan Feed Action:
 ```bash
 wsk -i package create --shared yes redhatdevelopers
 
-cd infinispan-feed-provider
+cd infinispan-feed-action
 mvn clean package
 
 wsk -i action update -a feed true redhatdevelopers/infinispan-feed \
