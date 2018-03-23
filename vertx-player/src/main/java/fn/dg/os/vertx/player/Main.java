@@ -117,10 +117,14 @@ public class Main extends AbstractVerticle {
                DecimalFormat df = new DecimalFormat("#.#");
                scoreTimer = vertx.setPeriodic(1000, id -> {
                   JsonObject scores = new JsonObject();
-                  scores.put(Task.DOG.toString(), Double.parseDouble(df.format(r.nextDouble())));
-                  scores.put(Task.CAT.toString(), Double.parseDouble(df.format(r.nextDouble())));
-                  scores.put(Task.PERSON.toString(), Double.parseDouble(df.format(r.nextDouble())));
-                  scores.put(Task.PENGUIN.toString(), Double.parseDouble(df.format(r.nextDouble())));
+                  scores.put(Task.DOG.toString().toLowerCase(),
+                     Double.parseDouble(df.format(r.nextDouble())));
+                  scores.put(Task.CAT.toString().toLowerCase(),
+                     Double.parseDouble(df.format(r.nextDouble())));
+                  scores.put(Task.PERSON.toString().toLowerCase(),
+                     Double.parseDouble(df.format(r.nextDouble())));
+                  scores.put(Task.PENGUIN.toString().toLowerCase(),
+                     Double.parseDouble(df.format(r.nextDouble())));
 
                   final String url = UUID.randomUUID().toString();
 
