@@ -49,7 +49,7 @@ public class WebsocketTask extends Task<Void> {
             JsonObject json = new JsonObject(new JsonObject(buff.toString()).getString("body"));
 
             Platform.runLater(() ->
-               partialResults.add(new JsonView(json.toString())));
+               partialResults.add(new JsonView(json.encodePrettily())));
          });
       });
    }
