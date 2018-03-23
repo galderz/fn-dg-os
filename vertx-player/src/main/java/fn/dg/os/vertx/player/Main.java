@@ -30,6 +30,7 @@ import org.infinispan.query.dsl.SortOrder;
 import org.infinispan.query.remote.client.ProtobufMetadataManagerConstants;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -113,12 +114,13 @@ public class Main extends AbstractVerticle {
                   playerCache.putAsync(name, player);
                });
 
+               DecimalFormat df = new DecimalFormat("#.#");
                scoreTimer = vertx.setPeriodic(1000, id -> {
                   JsonObject scores = new JsonObject();
-                  scores.put(Task.DOG.toString(), r.nextDouble());
-                  scores.put(Task.CAT.toString(), r.nextDouble());
-                  scores.put(Task.PERSON.toString(), r.nextDouble());
-                  scores.put(Task.PENGUIN.toString(), r.nextDouble());
+                  scores.put(Task.DOG.toString(), df.format(r.nextDouble()));
+                  scores.put(Task.CAT.toString(), df.format(r.nextDouble()));
+                  scores.put(Task.PERSON.toString(), df.format(r.nextDouble()));
+                  scores.put(Task.PENGUIN.toString(), df.format(r.nextDouble()));
 
                   final String url = UUID.randomUUID().toString();
 
