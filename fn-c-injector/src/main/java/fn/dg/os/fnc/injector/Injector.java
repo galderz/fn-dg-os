@@ -137,7 +137,7 @@ public class Injector extends AbstractVerticle {
                   value.put("scores", scores);
 
                   log.info(String.format("put(key=%s, value=%s)", txId, value));
-                  scoresCache.putAsync(txId, scores.toString());
+                  scoresCache.putAsync(txId, value.toString());
                });
 
                rc.response().end("Injector started");
