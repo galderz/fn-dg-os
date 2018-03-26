@@ -12,6 +12,7 @@ import org.infinispan.client.hotrod.RemoteCache;
 import org.infinispan.client.hotrod.RemoteCacheManager;
 import org.infinispan.client.hotrod.configuration.ConfigurationBuilder;
 
+import javax.sql.rowset.CachedRowSet;
 import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,6 +58,7 @@ public class Injector extends AbstractVerticle {
    public void start(io.vertx.core.Future<Void> future) throws Exception {
       Router router = Router.router(vertx);
       router.get("/inject").handler(this::inject);
+      router.get("/stop-inject").handler(this::stopInject);
 
       vertx
          .rxExecuteBlocking(this::remoteCacheManager)
@@ -74,6 +76,15 @@ public class Injector extends AbstractVerticle {
             }
             , future::fail
          );
+   }
+
+   private void stopInject(RoutingContext rc) {
+      final boolean cancelled = vertx.cancelTimer(scoreTimer);
+
+      if (cancelled)
+         rc.response().end("Injector stopped");
+      else
+         rc.response().end("Injector had not been started");
    }
 
    @Override
