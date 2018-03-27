@@ -67,6 +67,7 @@ public class Main extends AbstractVerticle {
       router.get("/leaderboard").handler(this::getLeaderboard);
       router.get("/scores/*").handler(sockJSHandler(vertx));
       router.get("/rank/:name").handler(this::getRank);
+      router.get("/inject/stop").handler(this::injectStop);
 
       vertx
          .rxExecuteBlocking(this::remoteCacheManager)
@@ -167,6 +168,16 @@ public class Main extends AbstractVerticle {
             , failure ->
                rc.response().end("Failed: " + failure)
          );
+   }
+
+   private void injectStop(RoutingContext rc) {
+      final boolean cancelledPlayerTimer = vertx.cancelTimer(playerTimer);
+      final boolean cancelledScoreTimer = vertx.cancelTimer(scoreTimer);
+
+      if (cancelledPlayerTimer && cancelledScoreTimer)
+         rc.response().end("Player and score injectors stopped");
+      else
+         rc.response().end("Player and score injectors not started");
    }
 
    private Handler<Future<JsonObject>> leaderboard() {
