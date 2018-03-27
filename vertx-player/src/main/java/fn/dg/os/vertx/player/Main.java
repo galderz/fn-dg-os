@@ -31,13 +31,16 @@ import org.infinispan.query.remote.client.ProtobufMetadataManagerConstants;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import static org.infinispan.query.dsl.Expression.count;
 
 public class Main extends AbstractVerticle {
 
@@ -53,6 +56,8 @@ public class Main extends AbstractVerticle {
    private long playerTimer;
    private long scoreTimer;
 
+   private AtomicInteger playerId = new AtomicInteger(1);
+
    private ScoreListener listener = new ScoreListener();;
 
    @Override
@@ -61,6 +66,7 @@ public class Main extends AbstractVerticle {
       router.get("/inject").handler(this::inject);
       router.get("/leaderboard").handler(this::getLeaderboard);
       router.get("/scores/*").handler(sockJSHandler(vertx));
+      router.get("/rank/:name").handler(this::getRank);
 
       vertx
          .rxExecuteBlocking(this::remoteCacheManager)
@@ -105,11 +111,11 @@ public class Main extends AbstractVerticle {
             () -> {
                Random r = new Random();
 
-               playerTimer = vertx.setPeriodic(1000, id -> {
-                  final String name = UUID.randomUUID().toString();
-                  int score = r.nextInt(1000); // 3 digit number
+               playerTimer = vertx.setPeriodic(2000, id -> {
+                  final int playerId = this.playerId.getAndIncrement();
+                  final String name = "player" + playerId;
+                  final Player player = new Player(name, 10000 - playerId);
 
-                  final Player player = new Player(name, score);
                   log.info(String.format("put(value=%s)", player));
                   playerCache.putAsync(name, player);
                });
@@ -150,8 +156,29 @@ public class Main extends AbstractVerticle {
          );
    }
 
+   private void getRank(RoutingContext rc) {
+      String playerName = rc.request().getParam("name");
+
+      vertx
+         .rxExecuteBlocking(rank(playerName))
+         .subscribe(
+            json ->
+               rc.response().end(json.encodePrettily())
+            , failure ->
+               rc.response().end("Failed: " + failure)
+         );
+   }
+
    private Handler<Future<JsonObject>> leaderboard() {
       return f -> f.complete(queryLeaderboard(playerCache));
+   }
+
+   private Handler<Future<JsonObject>> rank(String playerName) {
+      return f -> {
+         JsonObject leaders = queryLeaderboard(playerCache);
+         JsonObject leadersAndRank = queryRank(playerName, leaders, playerCache);
+         f.complete(leadersAndRank);
+      };
    }
 
    private static JsonObject queryLeaderboard(RemoteCache<String, Player> remoteCache) {
@@ -178,6 +205,40 @@ public class Main extends AbstractVerticle {
       // TODO: Current players to be calculated using some other method
       json.put("currentPlayers", remoteCache.size());
 
+      log.info("Leaderboard is: " + json);
+
+      return json;
+   }
+
+   private static JsonObject queryRank(String playerName, JsonObject json, RemoteCache<String, Player> remoteCache) {
+      log.info("Query rank for player: " + playerName);
+
+      final Player player = remoteCache.get(playerName);
+      final int score = player.getScore();
+
+      log.info("Score for player is: " + score);
+
+      QueryFactory qf = Search.getQueryFactory(remoteCache);
+      Query query = qf.from(Player.class)
+         .select(count("score"))
+         .orderBy("score", SortOrder.DESC)
+         .having("score").gt(score)
+         .groupBy("score") // TODO: Why needed?
+         .build();
+
+      List<Object[]> list = query.list();
+
+      log.info("Query result: " +
+         list.stream()
+            .map(Arrays::toString)
+            .collect(Collectors.joining(", "))
+      );
+
+      final long rank = list.size() + 1;
+
+      log.info("Rank is: " + rank);
+
+      json.put("rank", rank);
       return json;
    }
 
