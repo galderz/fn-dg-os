@@ -8,11 +8,11 @@ import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.Future;
 import io.vertx.reactivex.ext.web.Router;
 import io.vertx.reactivex.ext.web.RoutingContext;
+import io.vertx.reactivex.ext.web.handler.BodyHandler;
 import org.infinispan.client.hotrod.RemoteCache;
 import org.infinispan.client.hotrod.RemoteCacheManager;
 import org.infinispan.client.hotrod.configuration.ConfigurationBuilder;
 
-import javax.sql.rowset.CachedRowSet;
 import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
@@ -60,6 +60,9 @@ public class Injector extends AbstractVerticle {
       router.get("/inject").handler(this::inject);
       router.get("/stop-inject").handler(this::stopInject);
 
+      router.route("/sink*").handler(BodyHandler.create());
+      router.post("/sink").handler(this::sink);
+
       vertx
          .rxExecuteBlocking(this::remoteCacheManager)
          .flatMap(x -> vertx.rxExecuteBlocking(scoresCache()))
@@ -79,12 +82,20 @@ public class Injector extends AbstractVerticle {
    }
 
    private void stopInject(RoutingContext rc) {
+      log.info("Stop injector");
       final boolean cancelled = vertx.cancelTimer(scoreTimer);
 
       if (cancelled)
          rc.response().end("Injector stopped");
       else
          rc.response().end("Injector had not been started");
+   }
+
+   private void sink(RoutingContext rc) {
+      final String body = rc.getBodyAsString();
+      System.out.println("Body is: " + body);
+
+      rc.response().end("{done: true}");
    }
 
    @Override
