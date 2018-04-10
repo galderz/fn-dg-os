@@ -55,7 +55,7 @@ public class Schemaer extends AbstractVerticle {
             .rxExecuteBlocking(stopRemote(remote))
             .subscribe(
                 server -> {
-                    log.info("Removed listener and stopped remotes");
+                    log.info("Timer cancelled and remote connection stopped");
                     future.complete();
                 }
                 , future::fail
@@ -65,7 +65,7 @@ public class Schemaer extends AbstractVerticle {
     private Handler<Future<Void>> stopRemote(RemoteCacheManager remote) {
         return f -> {
             remote.stop();
-            f.complete(null);
+            f.complete();
         };
     }
 
@@ -86,10 +86,16 @@ public class Schemaer extends AbstractVerticle {
             final String metadata = metadataCache.get("player.proto");
             if (metadata == null)
                 registerSchema(metadataCache);
+            else
+                log.info(String.format("Player schema already registered in service=%s", hotrod));
         });
+
+        future.complete();
     }
 
     private void registerSchema(RemoteCache<String, String> metaCache) {
+        log.info(String.format("Register Player schema in service=%s", hotrod));
+
         SerializationContext serialCtx =
             ProtoStreamMarshaller.getSerializationContext(remote);
 
