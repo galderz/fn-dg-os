@@ -19,6 +19,8 @@
     <vertx.version>3.5.0</vertx.version>
 
     <metainf-services.version>1.7</metainf-services.version>
+
+    <version.wildfly.maven.plugin>1.2.0.Beta1</version.wildfly.maven.plugin>
   </properties>
 
   <dependencyManagement>
@@ -56,6 +58,28 @@
       <version>${metainf-services.version}</version>
       <optional>true</optional>
     </dependency>
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.12</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.infinispan</groupId>
+      <artifactId>infinispan-client-hotrod</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.wildfly.plugins</groupId>
+        <artifactId>wildfly-maven-plugin</artifactId>
+        <version>${version.wildfly.maven.plugin}</version>
+      </plugin>
+    </plugins>
+  </build>
 
 </project>
