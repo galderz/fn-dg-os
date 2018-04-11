@@ -22,24 +22,28 @@ public class SiteFilterTest {
     public void test000() {
         final RemoteCacheManager remote = new RemoteCacheManager();
         final RemoteCache<String, String> cache = remote.getCache();
+        cache.clear();
 
         final TestListener listener = new TestListener(cache);
         cache.addClientListener(listener);
 
-        final JsonObject value1 = new JsonObject();
-        value1.put("data-center", "A"); // expected site
+        try {
+            cache.put("001"
+                , new JsonObject().put("data-center", "A").toString()
+            );
+            listener.expectOnlyCreatedEvent("001");
 
-        cache.put("001", value1.toString());
-        listener.expectOnlyCreatedEvent("001");
-
-        final JsonObject value2 = new JsonObject();
-        value2.put("data-center", "A"); // not-expected site
-
-        cache.put("002", value1.toString());
-        listener.expectNoEvents();
+            cache.put("002"
+                , new JsonObject().put("data-center", "B").toString()
+            );
+            listener.expectNoEvents();
+        } finally {
+            cache.removeClientListener(listener);
+        }
     }
 
     @ClientListener(filterFactoryName = "site-filter-factory")
+    //@ClientListener
     private static final class TestListener {
 
         BlockingQueue<ClientCacheEntryCreatedEvent> events =
