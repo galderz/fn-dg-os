@@ -72,7 +72,7 @@ public class Schemaer extends AbstractVerticle {
 
     private Handler<Future<Void>> stopRemote(RemoteCacheManager remote) {
         return f -> {
-            if (remote != null)
+            if (remote != null && remote.isStarted())
                 remote.stop();
             f.complete();
         };
@@ -112,6 +112,8 @@ public class Schemaer extends AbstractVerticle {
         } catch (Throwable t) {
             log.log(Level.WARNING, "Schemaer failed", t);
             counter.set(0);
+        } finally {
+            this.remote.stop();
         }
     }
 
