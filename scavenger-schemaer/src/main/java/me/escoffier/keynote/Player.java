@@ -18,6 +18,7 @@ public class Player implements Shareable {
     private int score;
     private String playerId;
     private String playerName;
+    private String email;
 
     private List<Achievement> achievements = new CopyOnWriteArrayList<>();
 
@@ -57,6 +58,18 @@ public class Player implements Shareable {
         return playerName;
     }
 
+    @ProtoDoc("@Field(index = Index.NO, store = Store.NO)")
+    @ProtoField(number = 40, collectionImplementation = CopyOnWriteArrayList.class)
+    public List<Achievement> getAchievements() {
+        return achievements;
+    }
+
+    @ProtoDoc("@Field(index = Index.NO, store = Store.NO)")
+    @ProtoField(number = 50, required = false)
+    public String getEmail() {
+        return email;
+    }
+
     /**
      * Should only used by mappers, the score is computed using achievements.
      *
@@ -75,18 +88,16 @@ public class Player implements Shareable {
         this.playerName = username;
     }
 
-    @ProtoDoc("@Field(index = Index.NO, store = Store.NO)")
-    @ProtoField(number = 40, collectionImplementation = CopyOnWriteArrayList.class)
-    public List<Achievement> getAchievements() {
-        return achievements;
-    }
-
     public void setAchievements(List<Achievement> achievements) {
         if (achievements == null) {
             this.achievements = new CopyOnWriteArrayList<>();
         } else {
             this.achievements = achievements;
         }
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public List<Achievement> achievements() {
