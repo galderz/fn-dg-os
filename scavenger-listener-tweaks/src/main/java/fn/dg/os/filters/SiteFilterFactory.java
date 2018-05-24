@@ -41,14 +41,18 @@ public class SiteFilterFactory implements CacheEventFilterFactory {
                 "Accept %s for env.SITE=%s?", newValue, SITE_NAME
             ));
 
-            final JsonObject json = new JsonObject(newValue);
-            final String site = json.getString("data-center");
+            if (newValue != null) {
+                final JsonObject json = new JsonObject(newValue);
+                final String site = json.getString("data-center");
 
-            log.fine(String.format(
-                "Site in value is: %s", site
-            ));
+                log.fine(String.format(
+                    "Site in value is: %s", site
+                ));
 
-            return site.equals(SITE_NAME);
+                return site.equals(SITE_NAME);
+            }
+
+            return false;
         }
 
     }
